@@ -1,8 +1,5 @@
-"""
-Services package - Business logic layer
-"""
+"""Services package for DoNexus Document AI."""
 
-from app.services.pdf_processor import pdf_processor
-from app.services.ai_extractor import ai_extractor
+from app.services import pdf_processor, ai_extractor, quality_scorer, file_manager
 
-__all__ = ["pdf_processor", "ai_extractor"]
+__all__ = ["pdf_processor", "ai_extractor", "quality_scorer", "file_manager"]

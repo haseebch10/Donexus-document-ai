@@ -66,8 +66,11 @@ async def log_requests(request: Request, call_next):
     """Log all requests with timing"""
     start_time = time.time()
     
+    # Get request ID (set by add_request_id middleware)
+    request_id = getattr(request.state, "request_id", "unknown")
+    
     # Log request
-    logger.info(f"Request: {request.method} {request.url.path} | ID: {request.state.request_id}")
+    logger.info(f"Request: {request.method} {request.url.path} | ID: {request_id}")
     
     # Process request
     response = await call_next(request)
@@ -80,7 +83,7 @@ async def log_requests(request: Request, call_next):
         f"Response: {request.method} {request.url.path} | "
         f"Status: {response.status_code} | "
         f"Duration: {duration_ms:.2f}ms | "
-        f"ID: {request.state.request_id}"
+        f"ID: {request_id}"
     )
     
     return response
@@ -90,6 +93,7 @@ async def log_requests(request: Request, call_next):
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Handle validation errors"""
+    request_id = getattr(request.state, "request_id", "unknown")
     logger.error(f"Validation error: {exc.errors()}")
     
     return JSONResponse(
@@ -97,7 +101,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={
             "error": "Validation Error",
             "detail": exc.errors(),
-            "request_id": request.state.request_id
+            "request_id": request_id
         }
     )
 
@@ -105,6 +109,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Handle all uncaught exceptions"""
+    request_id = getattr(request.state, "request_id", "unknown")
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
     
     return JSONResponse(
@@ -112,7 +117,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={
             "error": "Internal Server Error",
             "message": str(exc) if settings.debug else "An unexpected error occurred",
-            "request_id": request.state.request_id
+            "request_id": request_id
         }
     )
 
@@ -144,9 +149,13 @@ async def root():
     }
 
 
-# Import routers (will add these next)
-# from app.api import upload, extraction, export
-# app.include_router(upload.router, prefix="/api", tags=["Upload"])
+# Import and register routers
+from app.api.upload import router as upload_router
+
+app.include_router(upload_router, tags=["Upload"])
+
+# Future routers
+# from app.api import extraction, export
 # app.include_router(extraction.router, prefix="/api", tags=["Extraction"])
 # app.include_router(export.router, prefix="/api", tags=["Export"])
 
