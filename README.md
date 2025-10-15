@@ -42,12 +42,14 @@ cd frontend
 # Install dependencies
 npm install
 
+# Environment
+cp .env.example .env
+
 # Run development server
 npm run dev
-```
 
-# Configure environment
-cp .env.example .env
+
+```
 
 
 Frontend will run on `http://localhost:5173`
