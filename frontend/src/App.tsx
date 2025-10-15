@@ -34,16 +34,35 @@ function HomePage() {
     try {
       const response = await uploadDocuments(selectedFiles);
       
-      if (response.failed > 0) {
-        const errorMsg = `${response.failed} of ${response.total_files} files failed to process`;
+      // Handle partial failures
+      if (response.failed > 0 && response.results.length > 0) {
+        const errorMsg = `Warning: ${response.failed} of ${response.total_files} file(s) failed to process. Successfully processed ${response.results.length} file(s).`;
         setError(errorMsg);
-      }
-      
-      if (response.results.length > 0) {
-        navigate('/results', { state: { results: response.results } });
+        // Still navigate to show successful results
+        navigate('/results', { state: { results: response.results, hasErrors: true } });
+      } else if (response.results.length > 0) {
+        // All successful
+        navigate('/results', { state: { results: response.results, hasErrors: false } });
+      } else if (response.failed > 0) {
+        // All failed
+        const errorDetails = response.errors?.map(e => `• ${e.original_filename}: ${e.error}`).join('\n') || 'Unknown error';
+        setError(`All files failed to process:\n${errorDetails}`);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to process documents');
+      // Network or unexpected errors
+      let errorMessage = 'Failed to process documents. ';
+      if (err instanceof Error) {
+        if (err.message.includes('Network')) {
+          errorMessage += 'Please check your internet connection and that the backend server is running.';
+        } else if (err.message.includes('413')) {
+          errorMessage += 'One or more files exceed the 10MB size limit.';
+        } else {
+          errorMessage += err.message;
+        }
+      } else {
+        errorMessage += 'Please try again.';
+      }
+      setError(errorMessage);
     } finally {
       setIsProcessing(false);
     }
@@ -245,25 +264,26 @@ function ResultsPage() {
             <div className="relative border-b">
               <TabsList className="h-auto bg-transparent p-0 w-full justify-start">
                 {openTabs.map((result, index) => (
-                  <div key={index} className="relative group">
+                  <div key={index} className="relative group inline-flex items-center">
                     <TabsTrigger 
                       value={String(index)}
-                      className="relative rounded-b-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-muted/50 px-4 py-2.5 gap-2"
+                      className="relative rounded-b-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-muted/50 px-4 py-2.5 pr-2 gap-2"
                     >
                       <FileText className="h-4 w-4" />
                       <span className="text-sm font-medium">
                         {truncateFilename(result.original_filename)}
                       </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCloseTab(index);
-                        }}
-                        className="ml-2 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
                     </TabsTrigger>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCloseTab(index);
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 z-10"
+                      aria-label={`Close ${result.original_filename}`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 ))}
               </TabsList>

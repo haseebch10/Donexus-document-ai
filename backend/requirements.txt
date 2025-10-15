@@ -10,7 +10,6 @@ pymupdf==1.23.26  # For advanced PDF features (optional)
 
 # AI/LLM
 openai==1.12.0
-anthropic==0.18.1
 
 # Data Validation & Serialization
 pydantic==2.6.0

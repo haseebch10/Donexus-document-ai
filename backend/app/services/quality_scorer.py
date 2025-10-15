@@ -91,14 +91,25 @@ class QualityScorer:
         Returns:
             QualityMetrics with scores and details
         """
-        logger.info("Starting quality assessment")
+        logger.info("━━━ Starting Quality Assessment ━━━")
         self.issues = []  # Reset issues
         
         # Calculate individual scores
+        logger.info("Calculating confidence score...")
         confidence_score = self._calculate_confidence_score(extraction)
+        logger.info(f"  → Confidence: {confidence_score:.2f}/100")
+        
+        logger.info("Calculating completeness score...")
         completeness_score = self._calculate_completeness_score(extraction)
+        logger.info(f"  → Completeness: {completeness_score:.2f}/100")
+        
+        logger.info("Calculating validation score...")
         validation_score = self._calculate_validation_score(extraction)
+        logger.info(f"  → Validation: {validation_score:.2f}/100")
+        
+        logger.info("Calculating consistency score...")
         consistency_score = self._calculate_consistency_score(extraction)
+        logger.info(f"  → Consistency: {consistency_score:.2f}/100")
         
         # Calculate weighted overall score
         overall_score = (
@@ -111,8 +122,16 @@ class QualityScorer:
         # Determine quality level
         quality_level = self._determine_quality_level(overall_score)
         
+        # Count issues
+        errors = len([i for i in self.issues if i.severity == "error"])
+        warnings = len([i for i in self.issues if i.severity == "warning"])
+        
         logger.info(
-            f"Quality assessment complete: {quality_level} ({overall_score:.1f})"
+            f"━━━ Quality Assessment Complete ━━━\n"
+            f"  Overall Score: {overall_score:.2f}/100 ({quality_level})\n"
+            f"  Confidence: {confidence_score:.2f} | Completeness: {completeness_score:.2f} | "
+            f"Validation: {validation_score:.2f} | Consistency: {consistency_score:.2f}\n"
+            f"  Issues: {errors} errors, {warnings} warnings"
         )
         
         # Return metrics - overall_score remains 0-100, confidence_score is 0-1
@@ -181,8 +200,11 @@ class QualityScorer:
         # Calculate average
         if required_confidences:
             avg_confidence = sum(required_confidences) / len(required_confidences)
-            return avg_confidence * 100
+            score = avg_confidence * 100
+            logger.debug(f"Confidence: {len(required_confidences)} fields averaged to {score:.2f}/100")
+            return score
         
+        logger.debug("Confidence: No confidence data, returning default 50.0")
         return 50.0
     
     def _calculate_completeness_score(self, extraction: LeaseExtraction) -> float:
@@ -228,8 +250,8 @@ class QualityScorer:
         score = (required_percentage * 0.7 + bonus_percentage * 0.3) * 100
         
         logger.debug(
-            f"Completeness: {required_filled}/{required_total} required, "
-            f"{bonus_filled}/{bonus_total} bonus"
+            f"Completeness: {required_filled}/{required_total} required ({required_percentage*100:.1f}%), "
+            f"{bonus_filled}/{bonus_total} bonus ({bonus_percentage*100:.1f}%) = {score:.2f}/100"
         )
         
         return score
@@ -375,7 +397,7 @@ class QualityScorer:
         
         score = (passed_rules / total_rules * 100) if total_rules > 0 else 100
         
-        logger.debug(f"Validation: {passed_rules}/{total_rules} rules passed")
+        logger.debug(f"Validation: {passed_rules}/{total_rules} rules passed ({score:.2f}/100)")
         
         return score
     
@@ -511,7 +533,7 @@ class QualityScorer:
         
         score = (passed_checks / total_checks * 100) if total_checks > 0 else 100
         
-        logger.debug(f"Consistency: {passed_checks}/{total_checks} checks passed")
+        logger.debug(f"Consistency: {passed_checks}/{total_checks} checks passed ({score:.2f}/100)")
         
         return score
     

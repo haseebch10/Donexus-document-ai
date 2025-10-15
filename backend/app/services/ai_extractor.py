@@ -2,22 +2,20 @@
 AI-Powered Lease Extraction Service
 
 Production-grade service for extracting structured lease data from German contracts
-using OpenAI GPT-4 with Claude fallback. Implements retry logic, structured output,
+using OpenAI GPT-4. Implements retry logic, structured output,
 and comprehensive error handling.
 """
 
 import json
-from typing import Dict, Optional, List, Tuple
+from typing import Dict
 from datetime import datetime
-from decimal import Decimal
 import asyncio
 
 from openai import AsyncOpenAI, OpenAIError
-from anthropic import AsyncAnthropic, AnthropicError
 from pydantic import ValidationError
 
 from app.config import settings
-from app.schemas import LeaseExtraction, TenantInfo, AddressData
+from app.schemas import LeaseExtraction
 from app.logging_config import logger
 
 
@@ -28,18 +26,16 @@ class ExtractionError(Exception):
 
 class AIExtractor:
     """
-    AI-powered extraction service with multi-model support and retry logic.
+    AI-powered extraction service with retry logic.
     
     Architecture:
-    - Primary: OpenAI GPT-4 with JSON mode
-    - Fallback: Claude 3 Opus/Sonnet
+    - OpenAI GPT-4 with JSON mode
     - Retry strategy: 3 attempts with exponential backoff
     - Structured output validation using Pydantic
     """
     
     # Model configuration
     OPENAI_MODEL = "gpt-4-turbo-preview"
-    CLAUDE_MODEL = "claude-3-opus-20240229"
     
     # Retry configuration
     MAX_RETRIES = 3
@@ -49,9 +45,8 @@ class AIExtractor:
     MAX_TOKENS = 4000
     
     def __init__(self):
-        """Initialize AI clients"""
+        """Initialize AI client"""
         self.openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-        self.claude_client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
         self._extraction_prompt = self._build_extraction_prompt()
     
     def _build_extraction_prompt(self) -> str:
@@ -144,17 +139,15 @@ Return a valid JSON object matching this structure:
 
 **CRITICAL:** Return ONLY valid JSON. No markdown, no explanations, no additional text."""
 
-    async def extract_from_text(
+    async def extract(
         self,
-        pdf_text: str,
-        use_fallback: bool = True
+        pdf_text: str
     ) -> Dict:
         """
         Extract lease data from PDF text using AI.
         
         Args:
             pdf_text: Extracted text from PDF document
-            use_fallback: Whether to use Claude fallback if OpenAI fails
             
         Returns:
             Extracted lease data as dictionary
@@ -162,31 +155,11 @@ Return a valid JSON object matching this structure:
         Raises:
             ExtractionError: If extraction fails after all retries
         """
-        logger.info("Starting AI extraction", extra={"text_length": len(pdf_text)})
+        logger.info(f"Starting AI extraction | Text length: {len(pdf_text)} chars")
         
-        # Try OpenAI first
-        try:
-            result = await self._extract_with_openai(pdf_text)
-            logger.info("Extraction successful with OpenAI")
-            return result
-        except Exception as e:
-            logger.warning(f"OpenAI extraction failed: {e}")
-            
-            if not use_fallback:
-                raise ExtractionError(f"OpenAI extraction failed: {e}")
-        
-        # Fallback to Claude
-        if use_fallback:
-            try:
-                logger.info("Attempting extraction with Claude fallback")
-                result = await self._extract_with_claude(pdf_text)
-                logger.info("Extraction successful with Claude")
-                return result
-            except Exception as e:
-                logger.error(f"Claude extraction also failed: {e}")
-                raise ExtractionError(f"All extraction attempts failed. Last error: {e}")
-        
-        raise ExtractionError("Extraction failed and fallback disabled")
+        result = await self._extract_with_openai(pdf_text)
+        logger.info(f"✓ Extraction successful with OpenAI | Model: {self.OPENAI_MODEL}")
+        return result
     
     async def _extract_with_openai(self, text: str) -> Dict:
         """
@@ -200,7 +173,7 @@ Return a valid JSON object matching this structure:
         """
         for attempt in range(self.MAX_RETRIES):
             try:
-                logger.debug(f"OpenAI extraction attempt {attempt + 1}/{self.MAX_RETRIES}")
+                logger.info(f"OpenAI extraction attempt {attempt + 1}/{self.MAX_RETRIES} | Model: {self.OPENAI_MODEL}")
                 
                 response = await self.openai_client.chat.completions.create(
                     model=self.OPENAI_MODEL,
@@ -215,6 +188,7 @@ Return a valid JSON object matching this structure:
                 
                 # Parse JSON response
                 result = json.loads(response.choices[0].message.content)
+                logger.info(f"OpenAI response parsed successfully | Keys extracted: {list(result.keys())}")
                 
                 # Add metadata
                 result["ai_model_used"] = self.OPENAI_MODEL
@@ -222,90 +196,26 @@ Return a valid JSON object matching this structure:
                 
                 # Validate against schema
                 await self._validate_extraction(result)
+                logger.info("OpenAI extraction validated against schema successfully")
                 
                 return result
                 
             except OpenAIError as e:
-                logger.warning(f"OpenAI API error on attempt {attempt + 1}: {e}")
+                logger.warning(f"OpenAI API error on attempt {attempt + 1}/{self.MAX_RETRIES}: {str(e)[:200]}")
                 if attempt < self.MAX_RETRIES - 1:
-                    await self._exponential_backoff(attempt)
+                    delay = await self._exponential_backoff(attempt)
+                    logger.info(f"Retrying after {delay:.2f}s backoff...")
                 else:
+                    logger.error(f"OpenAI extraction failed after {self.MAX_RETRIES} attempts")
                     raise
             except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse OpenAI JSON response: {e}")
+                logger.error(f"Failed to parse OpenAI JSON response on attempt {attempt + 1}: {e}")
                 if attempt < self.MAX_RETRIES - 1:
                     await self._exponential_backoff(attempt)
                 else:
                     raise ExtractionError(f"Invalid JSON from OpenAI: {e}")
             except Exception as e:
-                logger.error(f"Unexpected error in OpenAI extraction: {e}")
-                raise
-    
-    async def _extract_with_claude(self, text: str) -> Dict:
-        """
-        Extract data using Anthropic Claude as fallback.
-        
-        Args:
-            text: PDF text to extract from
-            
-        Returns:
-            Extracted data as dictionary
-        """
-        for attempt in range(self.MAX_RETRIES):
-            try:
-                logger.debug(f"Claude extraction attempt {attempt + 1}/{self.MAX_RETRIES}")
-                
-                response = await self.claude_client.messages.create(
-                    model=self.CLAUDE_MODEL,
-                    max_tokens=self.MAX_TOKENS,
-                    temperature=0.1,
-                    system=self._extraction_prompt,
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": f"Extract lease data from this German contract:\n\n{text}"
-                        }
-                    ]
-                )
-                
-                # Extract JSON from response
-                content = response.content[0].text
-                
-                # Claude might wrap JSON in markdown - clean it
-                content = content.strip()
-                if content.startswith("```json"):
-                    content = content[7:]
-                if content.startswith("```"):
-                    content = content[3:]
-                if content.endswith("```"):
-                    content = content[:-3]
-                content = content.strip()
-                
-                result = json.loads(content)
-                
-                # Add metadata
-                result["ai_model_used"] = self.CLAUDE_MODEL
-                result["extraction_timestamp"] = datetime.utcnow().isoformat()
-                
-                # Validate against schema
-                await self._validate_extraction(result)
-                
-                return result
-                
-            except AnthropicError as e:
-                logger.warning(f"Claude API error on attempt {attempt + 1}: {e}")
-                if attempt < self.MAX_RETRIES - 1:
-                    await self._exponential_backoff(attempt)
-                else:
-                    raise
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse Claude JSON response: {e}")
-                if attempt < self.MAX_RETRIES - 1:
-                    await self._exponential_backoff(attempt)
-                else:
-                    raise ExtractionError(f"Invalid JSON from Claude: {e}")
-            except Exception as e:
-                logger.error(f"Unexpected error in Claude extraction: {e}")
+                logger.error(f"Unexpected error in OpenAI extraction on attempt {attempt + 1}: {e}", exc_info=True)
                 raise
     
     async def _validate_extraction(self, data: Dict) -> None:
@@ -321,83 +231,25 @@ Return a valid JSON object matching this structure:
         try:
             # Validate using Pydantic schema
             LeaseExtraction(**data)
-            logger.debug("Extraction validation successful")
+            logger.info("✓ Extraction data validated against Pydantic schema")
         except ValidationError as e:
-            logger.error(f"Schema validation failed: {e}")
+            logger.error(f"✗ Schema validation failed: {e.error_count()} errors | {e.errors()[:3]}")
             raise ExtractionError(f"Extracted data doesn't match schema: {e}")
     
-    async def _exponential_backoff(self, attempt: int) -> None:
+    async def _exponential_backoff(self, attempt: int) -> float:
         """
         Implement exponential backoff between retries.
         
         Args:
             attempt: Current attempt number (0-indexed)
-        """
-        delay = self.BASE_RETRY_DELAY * (2 ** attempt)
-        logger.debug(f"Waiting {delay}s before retry")
-        await asyncio.sleep(delay)
-    
-    async def extract_with_quality_check(
-        self,
-        pdf_text: str,
-        min_confidence: float = 0.6
-    ) -> Tuple[Dict, List[str]]:
-        """
-        Extract data and perform quality checks.
-        
-        Args:
-            pdf_text: Extracted PDF text
-            min_confidence: Minimum acceptable confidence score
             
         Returns:
-            Tuple of (extracted_data, warnings)
+            Delay duration in seconds
         """
-        # Extract data
-        data = await self.extract_from_text(pdf_text)
-        
-        warnings = []
-        
-        # Check confidence scores
-        confidence_scores = data.get("confidence_scores", {})
-        low_confidence_fields = [
-            field for field, score in confidence_scores.items()
-            if score < min_confidence
-        ]
-        
-        if low_confidence_fields:
-            warnings.append(
-                f"Low confidence for fields: {', '.join(low_confidence_fields)}"
-            )
-        
-        # Check required fields
-        required_fields = [
-            "tenants", "address", "warm_rent", "cold_rent",
-            "contract_start_date", "rent_increase_type"
-        ]
-        
-        missing_fields = [
-            field for field in required_fields
-            if not data.get(field)
-        ]
-        
-        if missing_fields:
-            warnings.append(
-                f"Missing required fields: {', '.join(missing_fields)}"
-            )
-        
-        # Validate rent calculation
-        try:
-            warm_rent = Decimal(str(data.get("warm_rent", 0)))
-            cold_rent = Decimal(str(data.get("cold_rent", 0)))
-            
-            if warm_rent < cold_rent:
-                warnings.append(
-                    "Warm rent is less than cold rent - possible extraction error"
-                )
-        except (ValueError, TypeError) as e:
-            warnings.append(f"Invalid rent values: {e}")
-        
-        return data, warnings
+        delay = self.BASE_RETRY_DELAY * (2 ** attempt)
+        logger.info(f"⏱ Exponential backoff: waiting {delay}s before retry (attempt {attempt + 1})")
+        await asyncio.sleep(delay)
+        return delay
 
 
 # Singleton instance

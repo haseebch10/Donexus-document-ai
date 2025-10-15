@@ -18,7 +18,6 @@ class Settings(BaseSettings):
     
     # API Keys (Required for AI extraction)
     OPENAI_API_KEY: str = ""
-    ANTHROPIC_API_KEY: str = ""
     
     # CORS
     cors_origins: List[str] = ["http://localhost:5173", "http://localhost:3000"]
@@ -30,7 +29,6 @@ class Settings(BaseSettings):
     
     # AI Models
     primary_model: str = "gpt-4-turbo-preview"
-    fallback_model: str = "claude-3-sonnet-20240229"
     ai_temperature: float = 0.1
     ai_max_tokens: int = 2000
     

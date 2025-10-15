@@ -27,20 +27,39 @@ export function FileUpload({ onFilesSelect, isProcessing, maxFiles = 3 }: FileUp
 
   const validateAndAddFiles = useCallback((files: FileList | File[]) => {
     const fileArray = Array.from(files);
-    const pdfFiles = fileArray.filter(file => file.type === 'application/pdf');
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
+    
+    // Filter PDF files only
+    const pdfFiles = fileArray.filter(file => {
+      if (file.type !== 'application/pdf') {
+        return false;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        alert(`File "${file.name}" exceeds maximum size of 10MB (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+        return false;
+      }
+      if (file.size === 0) {
+        alert(`File "${file.name}" is empty`);
+        return false;
+      }
+      return true;
+    });
     
     if (pdfFiles.length === 0) {
-      alert('Please select PDF files only');
+      if (fileArray.length > 0 && fileArray.every(f => f.type !== 'application/pdf')) {
+        alert('Please select PDF files only');
+      }
       return;
     }
 
-    const newFiles = [...selectedFiles, ...pdfFiles].slice(0, maxFiles);
-    
-    if (newFiles.length > maxFiles) {
-      alert(`Maximum ${maxFiles} files allowed`);
+    // Check total count
+    const totalFiles = selectedFiles.length + pdfFiles.length;
+    if (totalFiles > maxFiles) {
+      alert(`Maximum ${maxFiles} files allowed. You can only add ${maxFiles - selectedFiles.length} more file(s).`);
       return;
     }
 
+    const newFiles = [...selectedFiles, ...pdfFiles];
     setSelectedFiles(newFiles);
     onFilesSelect(newFiles);
   }, [selectedFiles, maxFiles, onFilesSelect]);

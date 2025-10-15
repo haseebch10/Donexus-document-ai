@@ -74,6 +74,13 @@ def validate_file_upload(file: UploadFile) -> None:
             detail="No filename provided"
         )
     
+    # Sanitize filename to prevent path traversal
+    if ".." in file.filename or "/" in file.filename or "\\" in file.filename:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid filename. Filename cannot contain path separators or '..'."
+        )
+    
     # Check file extension
     file_extension = Path(file.filename).suffix.lower()
     if file_extension not in settings.allowed_extensions:
@@ -84,7 +91,7 @@ def validate_file_upload(file: UploadFile) -> None:
     
     # Check content type
     if file.content_type and "pdf" not in file.content_type.lower():
-        logger.warning(f"Unexpected content type: {file.content_type}")
+        logger.warning(f"Unexpected content type: {file.content_type} for file: {file.filename}")
     
     logger.info(f"File validation passed: {file.filename}")
 
@@ -131,7 +138,7 @@ async def process_upload(
         
         # Step 2: AI extraction
         logger.info(f"[{extraction_id}] Starting AI extraction")
-        extraction_dict = await ai_extractor.extract_from_text(pdf_text)
+        extraction_dict = await ai_extractor.extract(pdf_text)
         
         # Add metadata to the dictionary
         extraction_dict['extraction_timestamp'] = datetime.now().isoformat()
@@ -199,7 +206,7 @@ async def process_upload(
     The endpoint will:
     1. Validate the uploaded file
     2. Extract text from the PDF
-    3. Use AI (OpenAI GPT-4 or Claude) to extract structured data
+    3. Use AI (OpenAI GPT-4) to extract structured data
     4. Assess the quality of extraction
     5. Return structured lease data with quality metrics
     
@@ -238,10 +245,17 @@ async def upload_lease_document(
         
         # Save uploaded file
         logger.info(f"[{request_id}] Saving uploaded file")
-        file_path = file_manager.save_uploaded_file(
-            file.file,
-            file.filename
-        )
+        try:
+            file_path = file_manager.save_uploaded_file(
+                file.file,
+                file.filename
+            )
+        except ValueError as e:
+            # File size exceeded
+            raise HTTPException(
+                status_code=413,
+                detail=str(e)
+            )
         
         logger.info(f"[{request_id}] File saved to: {file_path}")
         
@@ -326,7 +340,9 @@ async def upload_multiple_documents(
             detail="No files provided"
         )
     
-    logger.info(f"[{request_id}] Processing batch upload with {len(files)} files")
+    logger.info(f"[{request_id}] ━━━ Processing batch upload: {len(files)} files ━━━")
+    for idx, f in enumerate(files):
+        logger.info(f"[{request_id}] File {idx + 1}: {f.filename} ({f.size / 1024:.2f} KB)")
     
     results = []
     errors = []
@@ -334,27 +350,36 @@ async def upload_multiple_documents(
     # Process each file
     for idx, file in enumerate(files):
         try:
+            logger.info(f"[{request_id}] ━━━ Processing file {idx + 1}/{len(files)}: {file.filename} ━━━")
+            
             # Validate file
             validate_file_upload(file)
+            logger.info(f"[{request_id}] ✓ Validation passed for {file.filename}")
             
             # Generate unique extraction ID
             extraction_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{idx}"
             
             # Save file
-            file_path = file_manager.save_uploaded_file(
-                file.file,
-                file.filename
-            )
-            logger.info(f"[{extraction_id}] File saved to: {file_path}")
+            try:
+                file_path = file_manager.save_uploaded_file(
+                    file.file,
+                    file.filename
+                )
+            except ValueError as ve:
+                # File size exceeded - treat as error
+                raise HTTPException(status_code=413, detail=str(ve))
+            
+            logger.info(f"[{extraction_id}] ✓ File saved to: {file_path}")
             
             # Process the file
+            logger.info(f"[{extraction_id}] Starting PDF processing pipeline...")
             result = await process_upload(file, file_path, extraction_id)
             result["success"] = True
             result["file_index"] = idx
             result["original_filename"] = file.filename
             
             results.append(result)
-            logger.info(f"[{extraction_id}] Successfully processed file: {file.filename}")
+            logger.info(f"[{extraction_id}] ✓ Successfully processed file {idx + 1}/{len(files)}: {file.filename}")
             
         except HTTPException as e:
             error_result = {
@@ -366,7 +391,7 @@ async def upload_multiple_documents(
                 "status_code": e.status_code
             }
             errors.append(error_result)
-            logger.error(f"[{request_id}] Failed to process {file.filename}: {e.detail}")
+            logger.error(f"[{request_id}] ✗ Failed to process file {idx + 1}/{len(files)} ({file.filename}): {e.detail}")
             
         except Exception as e:
             error_result = {
@@ -377,9 +402,14 @@ async def upload_multiple_documents(
                 "error_type": type(e).__name__
             }
             errors.append(error_result)
-            logger.error(f"[{request_id}] Unexpected error processing {file.filename}: {e}", exc_info=True)
+            logger.error(f"[{request_id}] ✗ Unexpected error processing file {idx + 1}/{len(files)} ({file.filename}): {e}", exc_info=True)
     
     # Return combined results
+    logger.info(
+        f"[{request_id}] ━━━ Batch upload complete ━━━\n"
+        f"  Total: {len(files)} | Success: {len(results)} | Failed: {len(errors)}"
+    )
+    
     return {
         "request_id": request_id,
         "total_files": len(files),

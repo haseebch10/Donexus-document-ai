@@ -79,10 +79,7 @@ class TestRealAIExtraction:
         print(f"✓ Model: {ai_extractor.OPENAI_MODEL}")
         print(f"✓ Max tokens: {ai_extractor.MAX_TOKENS}")
         
-        extraction_result = await ai_extractor.extract_from_text(
-            pdf_text,
-            use_fallback=False  # Only use OpenAI for this test
-        )
+        extraction_result = await ai_extractor.extract(pdf_text)
         
         print(f"✓ Extraction completed successfully!")
         print(f"✓ Model used: {extraction_result.get('ai_model_used')}")
@@ -268,10 +265,7 @@ class TestRealAIExtraction:
         print(f"Input: '{gibberish_text}'")
         
         try:
-            result = await ai_extractor.extract_from_text(
-                gibberish_text,
-                use_fallback=False
-            )
+            result = await ai_extractor.extract(gibberish_text)
             
             # AI might still try to extract, but confidence should be low
             print(f"\n⚠️  Extraction attempted despite invalid input")

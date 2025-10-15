@@ -100,6 +100,7 @@ class FileManager:
             
         Raises:
             IOError: If file save fails
+            ValueError: If file exceeds size limit
         """
         try:
             # Get date-based directory
@@ -111,19 +112,39 @@ class FileManager:
             
             logger.info(f"Saving file: {filename} as {unique_filename}")
             
-            # Save file
+            # Save file with size limit check
+            max_size = settings.max_file_size_mb * 1024 * 1024  # Convert MB to bytes
+            bytes_written = 0
+            
             with open(file_path, "wb") as f:
-                shutil.copyfileobj(file_content, f)
+                while True:
+                    chunk = file_content.read(8192)  # Read in 8KB chunks
+                    if not chunk:
+                        break
+                    
+                    bytes_written += len(chunk)
+                    if bytes_written > max_size:
+                        # Clean up partial file
+                        file_path.unlink(missing_ok=True)
+                        raise ValueError(
+                            f"File size exceeds maximum allowed size of {settings.max_file_size_mb}MB"
+                        )
+                    
+                    f.write(chunk)
             
             # Verify file was saved
-            if not file_path.exists():
+            if not file_path.exists() or file_path.stat().st_size == 0:
                 raise IOError(f"File save verification failed: {file_path}")
             
             file_size = file_path.stat().st_size
-            logger.info(f"File saved successfully: {file_path} ({file_size} bytes)")
+            logger.info(f"File saved successfully: {file_path} ({file_size / 1024 / 1024:.2f}MB)")
             
             return file_path
             
+        except ValueError as e:
+            # Re-raise validation errors
+            logger.error(f"File validation error for {filename}: {e}")
+            raise
         except Exception as e:
             logger.error(f"Error saving file {filename}: {e}", exc_info=True)
             raise IOError(f"Failed to save file: {e}")
