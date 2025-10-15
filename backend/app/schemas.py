@@ -99,9 +99,10 @@ class LeaseExtraction(BaseModel):
         description="AI confidence score for each field (0.0-1.0)"
     )
     extraction_timestamp: datetime = Field(default_factory=datetime.utcnow)
-    model_used: str = Field(default="unknown", description="AI model used for extraction")
+    ai_model_used: str = Field(default="unknown", description="AI model used for extraction")
     
     model_config = ConfigDict(
+        protected_namespaces=(),  # Allow model_* field names
         json_schema_extra={
             "example": {
                 "tenants": [

@@ -16,9 +16,9 @@ class Settings(BaseSettings):
     port: int = 8000
     debug: bool = True
     
-    # API Keys
-    openai_api_key: str = ""
-    anthropic_api_key: str = ""
+    # API Keys (Required for AI extraction)
+    OPENAI_API_KEY: str = ""
+    ANTHROPIC_API_KEY: str = ""
     
     # CORS
     cors_origins: List[str] = ["http://localhost:5173", "http://localhost:3000"]
