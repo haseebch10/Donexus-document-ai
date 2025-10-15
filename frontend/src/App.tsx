@@ -8,9 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { uploadDocuments } from '@/lib/api';
+import { exportToJSON, exportToExcel, exportAllToJSON, exportAllToExcel } from '@/lib/export';
 import type { BatchUploadResult } from '@/types/api';
-import { AlertCircle, Download, ArrowLeft, Loader2, X, FileText, Upload } from 'lucide-react';
+import { AlertCircle, Download, ArrowLeft, Loader2, X, FileText, Upload, ChevronDown, FileJson, FileSpreadsheet } from 'lucide-react';
 
 function HomePage() {
   const navigate = useNavigate();
@@ -168,27 +170,7 @@ function ResultsPage() {
     }
   };
 
-  const handleExportJSON = (data: BatchUploadResult) => {
-    const jsonStr = JSON.stringify(data, null, 2);
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `lease-extraction-${data.original_filename}-${new Date().toISOString()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleExportAll = () => {
-    const jsonStr = JSON.stringify(openTabs, null, 2);
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `lease-extractions-all-${new Date().toISOString()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  const currentResult = openTabs[parseInt(activeTab)];
 
   const truncateFilename = (filename: string, maxLength = 20) => {
     if (filename.length <= maxLength) return filename;
@@ -214,21 +196,47 @@ function ResultsPage() {
               Upload More Documents
             </Button>
             <div className="flex gap-2">
-              <Button 
-                variant="outline"
-                onClick={handleExportAll}
-                className="gap-2"
-              >
-                <Download className="h-4 w-4" />
-                Export All
-              </Button>
-              <Button 
-                onClick={() => openTabs[parseInt(activeTab)] && handleExportJSON(openTabs[parseInt(activeTab)])}
-                className="gap-2"
-              >
-                <Download className="h-4 w-4" />
-                Export Current
-              </Button>
+              {/* Export All Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <Download className="h-4 w-4" />
+                    Export All
+                    <ChevronDown className="h-4 w-4 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => exportAllToJSON(openTabs)}>
+                    <FileJson className="mr-2 h-4 w-4" />
+                    Export as JSON
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportAllToExcel(openTabs)}>
+                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                    Export as Excel
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Export Current Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button className="gap-2">
+                    <Download className="h-4 w-4" />
+                    Export Current
+                    <ChevronDown className="h-4 w-4 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => currentResult && exportToJSON(currentResult)}>
+                    <FileJson className="mr-2 h-4 w-4" />
+                    Export as JSON
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => currentResult && exportToExcel(currentResult)}>
+                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                    Export as Excel
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
