@@ -27,7 +27,7 @@ export function QualityMetrics({ metrics }: QualityMetricsProps) {
     return 'Poor';
   };
 
-  const overallScore = metrics.overall_score * 100;
+  const overallScore = metrics.overall_score;
 
   return (
     <Card>

@@ -118,7 +118,8 @@ async def process_upload(
     try:
         # Step 1: Extract text from PDF
         logger.info(f"[{extraction_id}] Extracting text from PDF")
-        pdf_text = pdf_processor.extract_text_from_pdf(file_path)
+        pdf_result = pdf_processor.extract_text(file_path)
+        pdf_text = pdf_result.get("text", "")
         
         if not pdf_text or len(pdf_text.strip()) < 100:
             raise HTTPException(
@@ -130,10 +131,13 @@ async def process_upload(
         
         # Step 2: AI extraction
         logger.info(f"[{extraction_id}] Starting AI extraction")
-        extraction = ai_extractor.extract_from_text(pdf_text)
+        extraction_dict = await ai_extractor.extract_from_text(pdf_text)
         
-        # Add metadata
-        extraction.extraction_timestamp = datetime.now()
+        # Add metadata to the dictionary
+        extraction_dict['extraction_timestamp'] = datetime.now().isoformat()
+        
+        # Convert to LeaseExtraction model
+        extraction = LeaseExtraction(**extraction_dict)
         
         logger.info(f"[{extraction_id}] AI extraction completed using {extraction.ai_model_used}")
         
