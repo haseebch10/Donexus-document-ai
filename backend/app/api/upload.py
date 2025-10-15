@@ -284,6 +284,112 @@ async def upload_lease_document(
         )
 
 
+@router.post(
+    "/batch",
+    response_model=Dict[str, Any],
+    summary="Upload multiple PDF documents",
+    description="Upload and process up to 3 PDF documents simultaneously"
+)
+async def upload_multiple_documents(
+    request: Request,
+    files: list[UploadFile] = File(..., description="PDF files to process (max 3)")
+) -> Dict[str, Any]:
+    """
+    Upload and process multiple PDF documents.
+    
+    This endpoint accepts up to 3 PDF files and processes them through
+    the extraction pipeline, returning results for each file.
+    
+    Args:
+        request: FastAPI request object
+        files: List of uploaded PDF files (max 3)
+        
+    Returns:
+        Dictionary containing results for each file
+        
+    Raises:
+        HTTPException: If validation or processing fails
+    """
+    request_id = f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
+    
+    # Validate number of files
+    max_files = 3
+    if len(files) > max_files:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Too many files. Maximum {max_files} files allowed per request. Got {len(files)}."
+        )
+    
+    if len(files) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="No files provided"
+        )
+    
+    logger.info(f"[{request_id}] Processing batch upload with {len(files)} files")
+    
+    results = []
+    errors = []
+    
+    # Process each file
+    for idx, file in enumerate(files):
+        try:
+            # Validate file
+            validate_file_upload(file)
+            
+            # Generate unique extraction ID
+            extraction_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{idx}"
+            
+            # Save file
+            file_path = file_manager.save_uploaded_file(
+                file.file,
+                file.filename
+            )
+            logger.info(f"[{extraction_id}] File saved to: {file_path}")
+            
+            # Process the file
+            result = await process_upload(file, file_path, extraction_id)
+            result["success"] = True
+            result["file_index"] = idx
+            result["original_filename"] = file.filename
+            
+            results.append(result)
+            logger.info(f"[{extraction_id}] Successfully processed file: {file.filename}")
+            
+        except HTTPException as e:
+            error_result = {
+                "success": False,
+                "file_index": idx,
+                "original_filename": file.filename,
+                "error": e.detail,
+                "error_type": "HTTPException",
+                "status_code": e.status_code
+            }
+            errors.append(error_result)
+            logger.error(f"[{request_id}] Failed to process {file.filename}: {e.detail}")
+            
+        except Exception as e:
+            error_result = {
+                "success": False,
+                "file_index": idx,
+                "original_filename": file.filename,
+                "error": str(e),
+                "error_type": type(e).__name__
+            }
+            errors.append(error_result)
+            logger.error(f"[{request_id}] Unexpected error processing {file.filename}: {e}", exc_info=True)
+    
+    # Return combined results
+    return {
+        "request_id": request_id,
+        "total_files": len(files),
+        "successful": len(results),
+        "failed": len(errors),
+        "results": results,
+        "errors": errors if errors else None
+    }
+
+
 @router.get(
     "/health",
     summary="Check upload service health",

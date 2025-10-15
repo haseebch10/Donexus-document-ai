@@ -2,16 +2,18 @@ import { useCallback, useState } from 'react';
 import { Upload, FileText, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 interface FileUploadProps {
-  onFileSelect: (file: File) => void;
+  onFilesSelect: (files: File[]) => void;
   isProcessing?: boolean;
+  maxFiles?: number;
 }
 
-export function FileUpload({ onFileSelect, isProcessing }: FileUploadProps) {
+export function FileUpload({ onFilesSelect, isProcessing, maxFiles = 3 }: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -23,6 +25,26 @@ export function FileUpload({ onFileSelect, isProcessing }: FileUploadProps) {
     }
   }, []);
 
+  const validateAndAddFiles = useCallback((files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    const pdfFiles = fileArray.filter(file => file.type === 'application/pdf');
+    
+    if (pdfFiles.length === 0) {
+      alert('Please select PDF files only');
+      return;
+    }
+
+    const newFiles = [...selectedFiles, ...pdfFiles].slice(0, maxFiles);
+    
+    if (newFiles.length > maxFiles) {
+      alert(`Maximum ${maxFiles} files allowed`);
+      return;
+    }
+
+    setSelectedFiles(newFiles);
+    onFilesSelect(newFiles);
+  }, [selectedFiles, maxFiles, onFilesSelect]);
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -30,26 +52,24 @@ export function FileUpload({ onFileSelect, isProcessing }: FileUploadProps) {
 
     const files = e.dataTransfer.files;
     if (files && files.length > 0) {
-      const file = files[0];
-      if (file.type === 'application/pdf') {
-        setSelectedFile(file);
-        onFileSelect(file);
-      }
+      validateAndAddFiles(files);
     }
-  }, [onFileSelect]);
+  }, [validateAndAddFiles]);
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      const file = files[0];
-      setSelectedFile(file);
-      onFileSelect(file);
+      validateAndAddFiles(files);
     }
-  }, [onFileSelect]);
+    // Reset input to allow selecting the same file again
+    e.target.value = '';
+  }, [validateAndAddFiles]);
 
-  const handleRemoveFile = useCallback(() => {
-    setSelectedFile(null);
-  }, []);
+  const handleRemoveFile = useCallback((index: number) => {
+    const newFiles = selectedFiles.filter((_, i) => i !== index);
+    setSelectedFiles(newFiles);
+    onFilesSelect(newFiles);
+  }, [selectedFiles, onFilesSelect]);
 
   return (
     <Card
@@ -64,15 +84,15 @@ export function FileUpload({ onFileSelect, isProcessing }: FileUploadProps) {
       onDrop={handleDrop}
     >
       <div className="p-12">
-        {!selectedFile ? (
+        {selectedFiles.length === 0 ? (
           <div className="flex flex-col items-center justify-center space-y-4 text-center">
             <div className="rounded-full bg-primary/10 p-6">
               <Upload className="h-10 w-10 text-primary" />
             </div>
             <div className="space-y-2">
-              <h3 className="text-lg font-semibold">Upload Lease Document</h3>
+              <h3 className="text-lg font-semibold">Upload Lease Documents</h3>
               <p className="text-sm text-muted-foreground max-w-sm">
-                Drag and drop your PDF lease document here, or click to browse
+                Drag and drop your PDF lease documents here, or click to browse (max {maxFiles} files)
               </p>
             </div>
             <div className="flex flex-col items-center space-y-2">
@@ -81,43 +101,75 @@ export function FileUpload({ onFileSelect, isProcessing }: FileUploadProps) {
                 disabled={isProcessing}
               >
                 <Upload className="mr-2 h-4 w-4" />
-                Select PDF File
+                Select PDF Files
               </Button>
               <p className="text-xs text-muted-foreground">
-                Supported format: PDF (max 10MB)
+                Supported format: PDF (max 10MB each, up to {maxFiles} files)
               </p>
             </div>
             <input
               id="file-input"
               type="file"
               accept=".pdf,application/pdf"
+              multiple
               className="hidden"
               onChange={handleFileInput}
               disabled={isProcessing}
             />
           </div>
         ) : (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="rounded-lg bg-primary/10 p-3">
-                <FileText className="h-8 w-8 text-primary" />
+          <div className="space-y-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold">Selected Files</h3>
+                <Badge variant="secondary">{selectedFiles.length}/{maxFiles}</Badge>
               </div>
-              <div>
-                <p className="font-medium">{selectedFile.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                </p>
-              </div>
+              {selectedFiles.length < maxFiles && !isProcessing && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => document.getElementById('file-input')?.click()}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Add More
+                </Button>
+              )}
             </div>
-            {!isProcessing && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleRemoveFile}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
+            
+            {selectedFiles.map((file, index) => (
+              <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <div className="rounded-lg bg-primary/10 p-2">
+                    <FileText className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">{file.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(file.size / 1024 / 1024).toFixed(2)} MB
+                    </p>
+                  </div>
+                </div>
+                {!isProcessing && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleRemoveFile(index)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+            
+            <input
+              id="file-input"
+              type="file"
+              accept=".pdf,application/pdf"
+              multiple
+              className="hidden"
+              onChange={handleFileInput}
+              disabled={isProcessing}
+            />
           </div>
         )}
       </div>

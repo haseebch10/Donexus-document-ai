@@ -7,24 +7,41 @@ import { QualityMetrics } from '@/components/QualityMetrics';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { uploadDocument } from '@/lib/api';
-import type { UploadResponse } from '@/types/api';
-import { AlertCircle, Download, ArrowLeft, Loader2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { uploadDocuments } from '@/lib/api';
+import type { BatchUploadResult } from '@/types/api';
+import { AlertCircle, Download, ArrowLeft, Loader2, X, FileText, Upload } from 'lucide-react';
 
 function HomePage() {
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
-  const handleFileSelect = async (file: File) => {
+  const handleFilesSelect = (files: File[]) => {
+    setSelectedFiles(files);
+    setError(null);
+  };
+
+  const handleProcessDocuments = async () => {
+    if (selectedFiles.length === 0) return;
+    
     setIsProcessing(true);
     setError(null);
 
     try {
-      const response = await uploadDocument(file);
-      navigate('/results', { state: { data: response } });
+      const response = await uploadDocuments(selectedFiles);
+      
+      if (response.failed > 0) {
+        const errorMsg = `${response.failed} of ${response.total_files} files failed to process`;
+        setError(errorMsg);
+      }
+      
+      if (response.results.length > 0) {
+        navigate('/results', { state: { results: response.results } });
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to process document');
+      setError(err instanceof Error ? err.message : 'Failed to process documents');
     } finally {
       setIsProcessing(false);
     }
@@ -55,13 +72,26 @@ function HomePage() {
             </CardHeader>
             <CardContent>
               <FileUpload 
-                onFileSelect={handleFileSelect} 
+                onFilesSelect={handleFilesSelect} 
                 isProcessing={isProcessing}
+                maxFiles={3}
               />
+              {selectedFiles.length > 0 && !isProcessing && (
+                <div className="mt-6 flex justify-center">
+                  <Button 
+                    onClick={handleProcessDocuments}
+                    size="lg"
+                    className="w-full max-w-md"
+                  >
+                    <Upload className="mr-2 h-5 w-5" />
+                    Process {selectedFiles.length} Document{selectedFiles.length > 1 ? 's' : ''} with AI
+                  </Button>
+                </div>
+              )}
               {isProcessing && (
                 <div className="mt-4 flex items-center justify-center space-x-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Processing document with AI...</span>
+                  <span>Processing documents with AI...</span>
                 </div>
               )}
             </CardContent>
@@ -118,22 +148,54 @@ function HomePage() {
 function ResultsPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const data = (location.state as { data: UploadResponse })?.data;
+  const results = (location.state as { results: BatchUploadResult[] })?.results;
+  const [activeTab, setActiveTab] = useState('0');
+  const [openTabs, setOpenTabs] = useState<BatchUploadResult[]>(results || []);
 
-  if (!data) {
+  if (!results || results.length === 0) {
     navigate('/');
     return null;
   }
 
-  const handleExportJSON = () => {
+  const handleCloseTab = (index: number) => {
+    const newTabs = openTabs.filter((_, i) => i !== index);
+    setOpenTabs(newTabs);
+    
+    if (newTabs.length === 0) {
+      navigate('/');
+    } else if (parseInt(activeTab) >= newTabs.length) {
+      setActiveTab(String(newTabs.length - 1));
+    }
+  };
+
+  const handleExportJSON = (data: BatchUploadResult) => {
     const jsonStr = JSON.stringify(data, null, 2);
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `lease-extraction-${new Date().toISOString()}.json`;
+    a.download = `lease-extraction-${data.original_filename}-${new Date().toISOString()}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportAll = () => {
+    const jsonStr = JSON.stringify(openTabs, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `lease-extractions-all-${new Date().toISOString()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const truncateFilename = (filename: string, maxLength = 20) => {
+    if (filename.length <= maxLength) return filename;
+    const ext = filename.split('.').pop();
+    const nameWithoutExt = filename.slice(0, filename.lastIndexOf('.'));
+    const truncatedName = nameWithoutExt.slice(0, maxLength - ext!.length - 4) + '...';
+    return `${truncatedName}.${ext}`;
   };
 
   return (
@@ -149,44 +211,93 @@ function ResultsPage() {
               className="gap-2"
             >
               <ArrowLeft className="h-4 w-4" />
-              Upload Another Document
+              Upload More Documents
             </Button>
-            <Button 
-              onClick={handleExportJSON}
-              className="gap-2"
-            >
-              <Download className="h-4 w-4" />
-              Export as JSON
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline"
+                onClick={handleExportAll}
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Export All
+              </Button>
+              <Button 
+                onClick={() => openTabs[parseInt(activeTab)] && handleExportJSON(openTabs[parseInt(activeTab)])}
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Export Current
+              </Button>
+            </div>
           </div>
 
-          {/* Results Grid */}
-          <div className="grid lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <ExtractionResults data={data.extraction} />
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <div className="relative border-b">
+              <TabsList className="h-auto bg-transparent p-0 w-full justify-start">
+                {openTabs.map((result, index) => (
+                  <div key={index} className="relative group">
+                    <TabsTrigger 
+                      value={String(index)}
+                      className="relative rounded-b-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-muted/50 px-4 py-2.5 gap-2"
+                    >
+                      <FileText className="h-4 w-4" />
+                      <span className="text-sm font-medium">
+                        {truncateFilename(result.original_filename)}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCloseTab(index);
+                        }}
+                        className="ml-2 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </TabsTrigger>
+                  </div>
+                ))}
+              </TabsList>
             </div>
-            <div>
-              <QualityMetrics metrics={data.quality_metrics} />
-            </div>
-          </div>
 
-          {/* AI Model Info */}
-          <Card className="bg-muted/50">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between text-sm">
-                <div>
-                  <span className="text-muted-foreground">AI Model:</span>
-                  <span className="ml-2 font-medium">{data.extraction.ai_model_used}</span>
+            {openTabs.map((result, index) => (
+              <TabsContent key={index} value={String(index)} className="mt-6">
+                <div className="grid lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2 space-y-6">
+                    <ExtractionResults data={result.extraction} />
+                  </div>
+                  <div>
+                    <QualityMetrics metrics={result.quality_metrics} />
+                  </div>
                 </div>
-                <div>
-                  <span className="text-muted-foreground">Extracted:</span>
-                  <span className="ml-2 font-medium">
-                    {new Date(data.extraction.extraction_timestamp).toLocaleString('de-DE')}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+
+                {/* AI Model Info */}
+                <Card className="bg-muted/50 mt-6">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between text-sm">
+                      <div>
+                        <span className="text-muted-foreground">AI Model:</span>
+                        <span className="ml-2 font-medium">{result.extraction.ai_model_used}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Extracted:</span>
+                        <span className="ml-2 font-medium">
+                          {new Date(result.extraction.extraction_timestamp).toLocaleString('de-DE')}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Processing Time:</span>
+                        <span className="ml-2 font-medium">
+                          {result.processing_time_seconds.toFixed(2)}s
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            ))}
+          </Tabs>
         </div>
       </main>
     </div>

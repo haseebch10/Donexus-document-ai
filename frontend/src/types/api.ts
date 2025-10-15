@@ -62,9 +62,32 @@ export interface UploadResponse {
   processing_time_seconds: number;
 }
 
+export interface BatchUploadResult extends UploadResponse {
+  file_index: number;
+  original_filename: string;
+}
+
+export interface BatchUploadError {
+  success: false;
+  file_index: number;
+  original_filename: string;
+  error: string;
+  error_type: string;
+  status_code?: number;
+}
+
+export interface BatchUploadResponse {
+  request_id: string;
+  total_files: number;
+  successful: number;
+  failed: number;
+  results: BatchUploadResult[];
+  errors: BatchUploadError[] | null;
+}
+
 export interface ErrorResponse {
   success: false;
   error: string;
   error_type: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
