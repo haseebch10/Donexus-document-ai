@@ -1,216 +1,429 @@
-# DoNexus Document AI 🚀
+# DoNexus - AI-Powered Lease Extraction System# DoNexus Document AI 🚀
 
-> AI-powered lease agreement extraction system for property managers
 
-[![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=flat&logo=fastapi)](https://fastapi.tiangolo.com/)
+
+> Extract structured data from German lease agreements (Mietverträge) using AI> AI-powered lease agreement extraction system for property managers
+
+
+
+---[![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=flat&logo=fastapi)](https://fastapi.tiangolo.com/)
+
 [![React](https://img.shields.io/badge/React-20232A?style=flat&logo=react&logoColor=61DAFB)](https://reactjs.org/)
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
+
+## 🚀 Setup & Run[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
+
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
-## 📋 Overview
+### Prerequisites
 
-DoNexus Document AI automates the extraction of structured data from German lease agreements (Mietverträge), eliminating manual data entry and reducing errors.
+- **Python 3.9+**## 📋 Overview
 
-**Features:**
+- **Node.js 18+**
+
+- **OpenAI API Key**DoNexus Document AI automates the extraction of structured data from German lease agreements (Mietverträge), eliminating manual data entry and reducing errors.
+
+
+
+### Backend Setup**Features:**
+
 - 📄 Drag-and-drop PDF upload
-- 🤖 AI-powered field extraction (GPT-4/Claude)
-- ✅ Multi-metric quality scoring
+
+```bash- 🤖 AI-powered field extraction (GPT-4/Claude)
+
+cd backend- ✅ Multi-metric quality scoring
+
 - 👥 Multi-tenant support
-- 📊 Export to CSV/Excel/JSON
-- 🎯 Real-time validation
+
+# Create virtual environment- 📊 Export to CSV/Excel/JSON
+
+python -m venv venv- 🎯 Real-time validation
+
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 ## 🏗️ Architecture
 
-```
-┌─────────────────┐
-│  React Frontend │ ← Drag & drop UI, results table
-└────────┬────────┘
-         │ REST API
-┌────────▼────────┐
-│  FastAPI Backend│ ← PDF processing, AI extraction
-└────────┬────────┘
-         │
-┌────────▼────────┐
-│ OpenAI/Claude   │ ← Structured data extraction
-└─────────────────┘
-```
+# Install dependencies
 
-## 🚀 Quick Start
+pip install -r requirements.txt```
+
+┌─────────────────┐
+
+# Configure environment│  React Frontend │ ← Drag & drop UI, results table
+
+cp .env.example .env└────────┬────────┘
+
+# Edit .env and add your OPENAI_API_KEY         │ REST API
+
+┌────────▼────────┐
+
+# Run server│  FastAPI Backend│ ← PDF processing, AI extraction
+
+python -m uvicorn app.main:app --reload└────────┬────────┘
+
+```         │
+
+┌────────▼────────┐
+
+Backend will run on `http://localhost:8000`│ OpenAI/Claude   │ ← Structured data extraction
+
+└─────────────────┘
+
+### Frontend Setup```
+
+
+
+```bash## 🚀 Quick Start
+
+cd frontend
 
 ### Prerequisites
-- Python 3.11+
-- Node.js 18+
+
+# Install dependencies- Python 3.11+
+
+npm install- Node.js 18+
+
 - OpenAI API key or Anthropic API key
 
-### Backend Setup
+# Run development server
+
+npm run dev### Backend Setup
+
+```
 
 ```bash
-cd backend
 
-# Create virtual environment
+Frontend will run on `http://localhost:5173`cd backend
+
+
+
+---# Create virtual environment
+
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install dependencies
-pip install -r requirements.txt
+## 🏗️ Technology Stacksource venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Configure environment
-cp .env.example .env
+
+
+### Backend# Install dependencies
+
+- **FastAPI** - Modern, fast Python web framework with automatic API documentationpip install -r requirements.txt
+
+- **OpenAI GPT-4** - Large language model for structured data extraction from German text
+
+- **pdfplumber** - Reliable PDF text extraction with fallback to PyPDF2# Configure environment
+
+- **Pydantic v2** - Data validation and schema enforcementcp .env.example .env
+
 # Edit .env and add your API keys
 
-# Run server
-uvicorn app.main:app --reload
-```
+### Frontend
 
-Server will be available at:
+- **React 18** - Component-based UI library# Run server
+
+- **TypeScript** - Type safety and better developer experienceuvicorn app.main:app --reload
+
+- **Vite** - Fast build tool and dev server```
+
+- **Tailwind CSS v3** - Utility-first CSS framework
+
+- **shadcn/ui** - High-quality, accessible component library (Radix UI)Server will be available at:
+
 - **API**: http://localhost:8000
-- **Docs**: http://localhost:8000/docs
 
-### Frontend Setup (Coming Soon)
+### Why These Choices?- **Docs**: http://localhost:8000/docs
 
-```bash
-cd frontend
+
+
+- **OpenAI GPT-4**: Best-in-class understanding of German legal documents, structured JSON output, high accuracy on complex nested data### Frontend Setup (Coming Soon)
+
+- **FastAPI**: Async support for concurrent uploads, automatic OpenAPI docs, built-in validation with Pydantic
+
+- **React + TypeScript**: Type-safe components, excellent ecosystem, fast development with Vite hot reload```bash
+
+- **Tailwind + shadcn/ui**: Rapid UI development with consistent design, accessible components out of the boxcd frontend
+
 npm install
-npm run dev
+
+---npm run dev
+
 ```
+
+## 📊 Quality Scoring System
 
 ## 📊 Extracted Fields
 
+Every extraction is scored using 4 metrics (0-100 scale):
+
 ### Required Fields
-- **Tenant Information**: Name(s), surname(s), birth dates
-- **Address**: Street, house number, ZIP code, city, unit
-- **Rent**: Cold rent, warm rent, utilities, parking
-- **Contract**: Start date, end date, active status
+
+### 1. **Confidence Score** (30% weight)- **Tenant Information**: Name(s), surname(s), birth dates
+
+- AI's confidence in each extracted field- **Address**: Street, house number, ZIP code, city, unit
+
+- Based on model certainty and field clarity- **Rent**: Cold rent, warm rent, utilities, parking
+
+- **Calculation**: Average confidence across required fields- **Contract**: Start date, end date, active status
+
 - **Rent Increase**: Type and schedule
 
-### Bonus Fields
-- Landlord information
-- Security deposit
-- Notice period
+### 2. **Completeness Score** (25% weight)
+
+- Percentage of required vs. optional fields filled### Bonus Fields
+
+- **Calculation**: `(Required fields × 0.7) + (Bonus fields × 0.3)`- Landlord information
+
+- **Required**: Tenants, address, rent, dates, rent increase type- Security deposit
+
+- **Bonus**: Landlord info, deposit, notice period, parking, utilities- Notice period
+
 - Special clauses
-- Property details (rooms, square meters)
 
-## 🎯 Quality Metrics
+### 3. **Validation Score** (25% weight)- Property details (rooms, square meters)
 
-The system calculates a multi-dimensional **Extraction Quality Score (EQS)**:
+- Business rule compliance (rent logic, date validity, value ranges)
 
-1. **Confidence Score** (30%): AI model's confidence per field
-2. **Completeness Score** (25%): Percentage of required fields extracted
-3. **Validation Score** (25%): Business rule compliance
+- **Checks**:## 🎯 Quality Metrics
+
+  - Warm rent ≥ Cold rent
+
+  - Contract end > Contract startThe system calculates a multi-dimensional **Extraction Quality Score (EQS)**:
+
+  - Rent in reasonable range (€100-€10,000)
+
+  - Deposit typically 2-3 months rent1. **Confidence Score** (30%): AI model's confidence per field
+
+  - Valid postal codes and room counts2. **Completeness Score** (25%): Percentage of required fields extracted
+
+- **Calculation**: `(Rules passed / Total rules) × 100`3. **Validation Score** (25%): Business rule compliance
+
 4. **Consistency Score** (20%): Cross-field logical consistency
 
-**Quality Tiers:**
-- 🟢 Excellent (80-100): High confidence, ready to use
-- 🟡 Good (60-79): Minor issues, review recommended
-- 🔴 Poor (0-59): Significant issues, manual review needed
+### 4. **Consistency Score** (20% weight)
 
-## 📁 Project Structure
+- Cross-field logical consistency**Quality Tiers:**
+
+- **Checks**:- 🟢 Excellent (80-100): High confidence, ready to use
+
+  - Active status matches end date- 🟡 Good (60-79): Minor issues, review recommended
+
+  - Rent increase schedule matches type- 🔴 Poor (0-59): Significant issues, manual review needed
+
+  - Postal code matches city (e.g., Munich 80000-81999)
+
+  - Parking rent < Cold rent## 📁 Project Structure
+
+- **Calculation**: `(Checks passed / Total checks) × 100`
 
 ```
-donexus-document-ai/
-├── backend/
-│   ├── app/
-│   │   ├── main.py              # FastAPI application
-│   │   ├── config.py            # Configuration
+
+### Overall Score (EQS)donexus-document-ai/
+
+```├── backend/
+
+EQS = (Confidence × 0.30) + (Completeness × 0.25) + │   ├── app/
+
+      (Validation × 0.25) + (Consistency × 0.20)│   │   ├── main.py              # FastAPI application
+
+```│   │   ├── config.py            # Configuration
+
 │   │   ├── schemas.py           # Data models
-│   │   ├── storage.py           # File-based storage
-│   │   ├── services/            # Business logic (coming soon)
-│   │   └── api/                 # API routes (coming soon)
-│   ├── requirements.txt
-│   ├── .env.example
+
+**Quality Levels**:│   │   ├── storage.py           # File-based storage
+
+- **Excellent**: 90-100│   │   ├── services/            # Business logic (coming soon)
+
+- **Good**: 75-89│   │   └── api/                 # API routes (coming soon)
+
+- **Fair**: 60-74│   ├── requirements.txt
+
+- **Poor**: 0-59│   ├── .env.example
+
 │   └── README.md
-│
+
+---│
+
 ├── frontend/                    # React app (coming soon)
-├── docs/
+
+## 📁 Project Structure├── docs/
+
 │   ├── ARCHITECTURE_PLAN.md     # Detailed architecture
-│   └── SCHEMA_ANALYSIS.md       # Schema design decisions
-└── README.md                    # This file
-```
 
-## 🛠️ Technology Stack
+```│   └── SCHEMA_ANALYSIS.md       # Schema design decisions
 
-| Component | Technology | Why |
-|-----------|-----------|-----|
-| **Backend** | FastAPI | Async support, auto-docs, type safety |
-| **AI** | OpenAI GPT-4 / Claude | Best German language understanding |
-| **PDF** | pdfplumber | Layout-aware extraction |
-| **Frontend** | React + TypeScript | Type-safe, component-rich |
-| **Storage** | File-based (JSON) | Simple, no DB overhead for MVP |
-| **Validation** | Pydantic v2 | Runtime type checking |
+Donexus/└── README.md                    # This file
 
-## 📝 API Endpoints
+├── backend/```
 
-### Current
-- `GET /health` - Health check
-- `GET /` - API information
+│   ├── app/
 
-### Coming Soon
+│   │   ├── api/          # API endpoints## 🛠️ Technology Stack
+
+│   │   ├── services/     # Business logic (AI, PDF, Quality)
+
+│   │   ├── schemas.py    # Pydantic models| Component | Technology | Why |
+
+│   │   └── main.py       # FastAPI app|-----------|-----------|-----|
+
+│   ├── tests/            # Pytest tests| **Backend** | FastAPI | Async support, auto-docs, type safety |
+
+│   └── requirements.txt| **AI** | OpenAI GPT-4 / Claude | Best German language understanding |
+
+│| **PDF** | pdfplumber | Layout-aware extraction |
+
+├── frontend/| **Frontend** | React + TypeScript | Type-safe, component-rich |
+
+│   ├── src/| **Storage** | File-based (JSON) | Simple, no DB overhead for MVP |
+
+│   │   ├── components/   # React components| **Validation** | Pydantic v2 | Runtime type checking |
+
+│   │   ├── lib/          # API client, utilities
+
+│   │   └── types/        # TypeScript types## 📝 API Endpoints
+
+│   └── package.json
+
+│### Current
+
+└── README.md- `GET /health` - Health check
+
+```- `GET /` - API information
+
+
+
+---### Coming Soon
+
 - `POST /api/upload` - Upload PDF
-- `GET /api/extractions` - List extractions
+
+## 🔒 Security Features- `GET /api/extractions` - List extractions
+
 - `GET /api/extractions/{id}` - Get single extraction
-- `POST /api/export` - Export data
 
-## 🧪 Testing
+- **File size validation**: 10MB limit (client + server)- `POST /api/export` - Export data
 
-```bash
+- **Filename sanitization**: Path traversal protection
+
+- **Chunked file reading**: Memory-efficient with size enforcement## 🧪 Testing
+
+- **Input validation**: Pydantic schema validation on all data
+
+- **CORS configuration**: Restricted origins for production```bash
+
 # Backend tests
-cd backend
+
+---cd backend
+
 pytest
 
+## 📤 Export Formats
+
 # Frontend tests
-cd frontend
-npm test
+
+- **JSON**: Full structured data with all fieldscd frontend
+
+- **Excel**: Flattened 30+ column spreadsheet with auto-sized columnsnpm test
+
 ```
+
+---
 
 ## 📄 Example Output
 
+## 🧪 Testing
+
 ```json
-{
-  "tenants": [
+
+```bash{
+
+cd backend  "tenants": [
+
     {"first_name": "Daniela", "last_name": "Rudolph", "birth_date": "1992-02-16"},
-    {"first_name": "Hendrik", "last_name": "Weber", "birth_date": "1989-09-11"}
-  ],
+
+# Run all tests    {"first_name": "Hendrik", "last_name": "Weber", "birth_date": "1989-09-11"}
+
+pytest  ],
+
   "address": {
-    "street": "Zieblandstraße",
-    "house_number": "25",
+
+# Run with coverage    "street": "Zieblandstraße",
+
+pytest --cov=app tests/    "house_number": "25",
+
     "zip_code": "80798",
-    "city": "München",
-    "apartment_unit": "3.OG links"
-  },
+
+# Run specific test file    "city": "München",
+
+pytest tests/test_quality_scorer.py -v    "apartment_unit": "3.OG links"
+
+```  },
+
   "warm_rent": 1405.00,
-  "cold_rent": 1040.00,
-  "parking_rent": 75.00,
-  "contract_start_date": "2020-03-01",
-  "is_active": true,
+
+**Test Coverage**:  "cold_rent": 1040.00,
+
+- Quality Scorer: 18/18 tests passing  "parking_rent": 75.00,
+
+- PDF Processor: 15/15 tests passing  "contract_start_date": "2020-03-01",
+
+- Real extraction: Integration tests with actual PDFs  "is_active": true,
+
   "quality": {
-    "overall_score": 92.5,
+
+---    "overall_score": 92.5,
+
     "quality_tier": "excellent"
-  }
+
+## 📝 API Documentation  }
+
 }
-```
 
-## 🗺️ Roadmap
+Once the backend is running, visit:```
 
-### Phase 1: Core MVP ✅
+- **Swagger UI**: http://localhost:8000/docs
+
+- **ReDoc**: http://localhost:8000/redoc## 🗺️ Roadmap
+
+
+
+---### Phase 1: Core MVP ✅
+
 - [x] Project structure
-- [x] FastAPI backend setup
+
+## 🎯 Features- [x] FastAPI backend setup
+
 - [x] Data schemas with validation
-- [x] Multi-tenant support
-- [ ] PDF processing service
-- [ ] AI extraction service
-- [ ] Upload API endpoint
 
-### Phase 2: Frontend & Polish
+- **Multi-PDF Upload**: Process up to 3 PDFs simultaneously with browser-style tabs- [x] Multi-tenant support
+
+- **Real-time Processing**: Manual trigger button for user control- [ ] PDF processing service
+
+- **Quality Metrics**: Visual quality indicators with detailed breakdowns- [ ] AI extraction service
+
+- **Export Options**: Download individual or all results as JSON/Excel- [ ] Upload API endpoint
+
+- **Error Handling**: Client and server-side validation with user-friendly messages
+
+- **Responsive Design**: Works on desktop and mobile devices### Phase 2: Frontend & Polish
+
 - [ ] React frontend with drag-and-drop
-- [ ] Results table with sorting/filtering
-- [ ] Export functionality
-- [ ] Quality score visualization
 
-### Phase 3: Advanced Features
+---- [ ] Results table with sorting/filtering
+
+- [ ] Export functionality
+
+## 📄 License- [ ] Quality score visualization
+
+
+
+Proprietary - DoNexus Document AI### Phase 3: Advanced Features
+
 - [ ] OCR for scanned documents
-- [ ] Batch processing
+
+---- [ ] Batch processing
+
 - [ ] PDF highlighting (visual extraction)
-- [ ] Database integration
+
+Built with ❤️ for property managers- [ ] Database integration
+
 - [ ] User authentication
 
 ## 🤝 Contributing
